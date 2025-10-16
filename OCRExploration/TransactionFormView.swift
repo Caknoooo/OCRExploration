@@ -1,8 +1,9 @@
 import SwiftUI
 import PhotosUI
+import Vision
 
 struct TransactionFormView: View {
-    @StateObject private var ocrService = OCRService()
+    @StateObject private var aiOcrService = AIOCRService()
     @StateObject private var transactionStore = TransactionStore()
     @State private var selectedImage: UIImage?
     @State private var showingImagePicker = false
@@ -63,13 +64,62 @@ struct TransactionFormView: View {
                     }
                 }
                 
-                if ocrService.isProcessing {
+                if aiOcrService.isProcessing {
                     Section {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("Memproses OCR...")
+                            Text("Memproses AI OCR...")
                                 .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                if !aiOcrService.recognizedTexts.isEmpty && aiOcrService.processedImage != nil {
+                    Section(header: Text("Hasil AI OCR")) {
+                        OCRResultView(
+                            image: aiOcrService.processedImage!,
+                            recognizedTexts: aiOcrService.recognizedTexts
+                        )
+                        
+                        if !aiOcrService.aiAnalysis.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("AI Analysis:")
+                                    .font(.headline)
+                                Text(aiOcrService.aiAnalysis)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(4)
+                                
+                                HStack {
+                                    Text("Apakah hasil OCR benar?")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Spacer()
+                                    
+                                    Button("✅ Benar") {
+                                        let allText = aiOcrService.recognizedTexts.compactMap { observation in
+                                            observation.topCandidates(1).first?.string
+                                        }.joined(separator: " ")
+                                        aiOcrService.learnFromPattern(allText, isCorrect: true)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    
+                                    Button("❌ Salah") {
+                                        let allText = aiOcrService.recognizedTexts.compactMap { observation in
+                                            observation.topCandidates(1).first?.string
+                                        }.joined(separator: " ")
+                                        aiOcrService.learnFromPattern(allText, isCorrect: false)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .foregroundColor(.red)
+                                }
+                            }
                         }
                     }
                 }
@@ -115,13 +165,13 @@ struct TransactionFormView: View {
             .sheet(isPresented: $showingCamera) {
                 CameraPicker(selectedImage: $selectedImage)
             }
-            .onChange(of: selectedImage) { image in
+            .onChange(of: selectedImage) { _, image in
                 if let image = image {
-                    ocrService.extractDataFromImage(image)
+                    aiOcrService.extractDataFromImage(image)
                 }
             }
-            .onChange(of: ocrService.extractedData) { extractedData in
-                if !ocrService.isProcessing {
+            .onChange(of: aiOcrService.extractedData) { _, extractedData in
+                if !aiOcrService.isProcessing {
                     amount = String(format: "%.0f", extractedData.amount)
                     date = extractedData.date
                     transactionId = extractedData.transactionId
@@ -144,7 +194,7 @@ struct TransactionFormView: View {
         date = Date()
         transactionId = ""
         description = ""
-        ocrService.extractedData = Transaction()
+        aiOcrService.extractedData = Transaction()
     }
     
     private func saveTransaction() {

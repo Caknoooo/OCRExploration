@@ -1,7 +1,8 @@
 import Foundation
+import Combine
 
-struct Transaction: Identifiable, Codable {
-    let id = UUID()
+struct Transaction: Identifiable, Codable, Equatable {
+    let id: UUID
     var amount: Double
     var date: Date
     var transactionId: String
@@ -9,6 +10,7 @@ struct Transaction: Identifiable, Codable {
     var imageData: Data?
     
     init(amount: Double = 0, date: Date = Date(), transactionId: String = "", description: String = "", imageData: Data? = nil) {
+        self.id = UUID()
         self.amount = amount
         self.date = date
         self.transactionId = transactionId
